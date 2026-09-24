@@ -1,0 +1,177 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecommerce-inventory-automator"
+version = "1.0.0"
+description = "E-Commerce Multi-Channel Inventory & Operations Automator"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Jerry SZC", email = "jerry@example.com"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.0",
+    "uvicorn[standard]>=0.53.0",
+    "sqlmodel>=0.0.47",
+    "alembic>=1.20.0",
+    "psycopg[binary]>=3.3.0",
+    "pydantic-settings>=2.15.0",
+    "python-jose[cryptography]>=3.5.0",
+    "bcrypt>=5.0.0",
+    "python-multipart>=0.0.32",
+    "openpyxl>=3.1.5",
+    "httpx>=0.28.0",
+]
+optional-dependencies = {
+    "dev": [
+        "pytest>=8.3.0",
+        "pytest-cov>=4.1.0",
+        "httpx>=0.28.0",
+    ],
+    "quality": [
+        "ruff>=0.4.0",
+        "black>=24.3.0",
+        "mypy>=1.10.0",
+        "pre-commit>=3.7.0",
+    ],
+}
+
+[project.urls]
+Homepage = "https://github.com/jerryszc/ecommerce-inventory-automator"
+Repository = "https://github.com/jerryszc/ecommerce-inventory-automator"
+Issues = "https://github.com/jerryszc/ecommerce-inventory-automator/issues"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "T20", # flake8-print
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # function calls in default args
+]
+per-file-ignores = {
+    "tests/*": ["S101", "S106"],  # assert, hardcoded passwords in tests
+    "alembic/*": ["S101", "T201"], # migrations
+}
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "pgdata",
+    ".pytest_cache",
+    "htmlcov",
+    "dist",
+    "build",
+    "*.egg-info",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.venv
+  | \.git
+  | __pycache__
+  | pgdata
+  | \.pytest_cache
+  | htmlcov
+  | dist
+  | build
+  | alembic/versions
+)/
+'''
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+show_error_codes = true
+pretty = true
+namespace_packages = true
+explicit_package_bases = true
+enable_error_code = ["ignore-without-code"]
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "pgdata",
+    ".pytest_cache",
+    "htmlcov",
+    "dist",
+    "build",
+    "alembic",
+    "tests",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "sqlmodel.*",
+    "pydantic.*",
+    "fastapi.*",
+    "starlette.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/alembic/*",
+    "*/migrations/*",
+]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+precision = 2
+
+[tool.pre-commit]
+# See .pre-commit-config.yaml for hook definitions

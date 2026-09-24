@@ -1,5 +1,13 @@
 # E-Commerce Multi-Channel Inventory & Operations Automator
 
+[![CI/CD](https://github.com/jerryszc/ecommerce-inventory-automator/actions/workflows/ci.yml/badge.svg)](https://github.com/jerryszc/ecommerce-inventory-automator/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/jerryszc/ecommerce-inventory-automator/branch/main/graph/badge.svg)](https://codecov.io/gh/jerryszc/ecommerce-inventory-automator)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.141+-009688.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg)](https://www.docker.com/)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 > **SOP (Standard Operating Procedure)** — Guía para fundadores no técnicos y equipo técnico.
 > **Versión:** 1.0 | **Stack:** Python 3.12, FastAPI, PostgreSQL 16, SQLModel, Alembic, Docker Compose
 
@@ -377,7 +385,13 @@ docker compose exec api pytest --cov=app --cov-report=term-missing
 
 ## 📝 Licencia / License
 
-MIT — Uso libre para fines comerciales y educativos.
+MIT — Uso libre para fines comerciales y educativos. Ver [LICENSE](LICENSE).
+
+---
+
+## 📋 Changelog
+
+Ver [CHANGELOG.md](CHANGELOG.md) para historial completo de versiones.
 
 ---
 

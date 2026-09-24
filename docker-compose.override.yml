@@ -1,0 +1,25 @@
+# Development override - hot reload, debug tools
+# Usage: docker compose -f docker-compose.yml -f docker-compose.override.yml up
+
+services:
+  api:
+    build:
+      target: builder
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /code/app
+    volumes:
+      - ./app:/code/app
+      - ./data:/code/data
+      - ./tests:/code/tests
+    environment:
+      PYTHONPATH: /code
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G

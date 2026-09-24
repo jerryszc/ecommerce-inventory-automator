@@ -1,0 +1,69 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please describe your idea below.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What pain point does it address?
+      placeholder: "Currently, users cannot..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal solution. How should it work?
+      placeholder: "I propose adding a new endpoint /api/v1/... that..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches did you consider? Why is this the best?
+      placeholder: "I considered X but it has drawback Y..."
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Notes
+      description: Any technical details, API design, database changes, or migration considerations?
+      placeholder: |
+        - New model: ...
+        - New endpoint: POST /api/v1/...
+        - Migration: alembic revision --autogenerate
+        - Tests: add to tests/test_...
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low (nice to have)
+        - Medium (should have)
+        - High (must have for next release)
+        - Critical (blocking)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues/PRs for duplicates
+          required: true
+        - label: This feature aligns with the project scope (multi-channel inventory automation)
+          required: true
+        - label: I'm willing to implement this feature (or help with implementation)
+          required: false

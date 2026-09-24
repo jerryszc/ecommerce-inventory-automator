@@ -15,9 +15,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
 
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
     restart: unless-stopped
     depends_on:
       db:
@@ -28,15 +39,20 @@ services:
       - .env
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/code/app
-      - ./data:/code/data
-      - ./tests:/code/tests
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   pgdata:
