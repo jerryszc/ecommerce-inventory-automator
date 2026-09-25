@@ -147,3 +147,38 @@ class UserRead(SQLModel):
 class Token(SQLModel):
     access_token: str
     token_type: str
+
+
+class UserBase(SQLModel):
+    email: str = Field(max_length=255)
+    role: str = Field(max_length=20, default="operator")
+    is_active: bool = True
+
+
+class UserCreate(UserBase):
+    password: str = Field(min_length=8, max_length=72)
+
+
+class UserUpdate(SQLModel):
+    email: Optional[str] = Field(default=None, max_length=255)
+    role: Optional[str] = Field(default=None, max_length=20)
+    is_active: Optional[bool] = None
+    password: Optional[str] = Field(default=None, min_length=8, max_length=72)
+
+
+class UserRead(UserBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TokenRefresh(SQLModel):
+    refresh_token: str
+
+
+class TokenPair(SQLModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"

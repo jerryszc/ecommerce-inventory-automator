@@ -9,4 +9,7 @@ bcrypt
 python-multipart
 openpyxl
 httpx
+slowapi
+structlog
+prometheus-client
 pytest==8.3.4

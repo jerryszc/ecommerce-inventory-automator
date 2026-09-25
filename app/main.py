@@ -1,12 +1,34 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from sqlmodel import Session, select
+from datetime import datetime
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import Session, select, text
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import engine, create_db_and_tables
 from app.models import Channel, User
-from app.routers import products, variants, channels, inventory, imports, alerts, auth
+from app.routers import products, variants, channels, inventory, imports, alerts, auth, metrics
+
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
+
+# Security headers middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+        return response
 
 
 @asynccontextmanager
@@ -33,9 +55,42 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
+    # Rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Security headers
+    app.add_middleware(SecurityHeadersMiddleware)
+
     @app.get("/health")
-    def health() -> dict[str, str]:
+    @limiter.limit("60/minute")
+    def health(request: Request) -> dict[str, str]:
         return {"status": "ok", "env": settings.app_env}
+
+    @app.get("/health/detailed")
+    @limiter.limit("30/minute")
+    def health_detailed(request: Request) -> dict:
+        db_status = "ok"
+        try:
+            with Session(engine) as session:
+                session.exec(text("SELECT 1"))
+        except Exception:
+            db_status = "error"
+        return {
+            "status": "ok",
+            "env": settings.app_env,
+            "database": db_status,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
 
     app.include_router(auth.router)
     app.include_router(products.router)
@@ -44,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(inventory.router)
     app.include_router(imports.router)
     app.include_router(alerts.router)
+    app.include_router(metrics.router)
 
     return app
 

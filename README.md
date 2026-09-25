@@ -7,6 +7,10 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.141+-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg)](https://www.docker.com/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Rate Limiting](https://img.shields.io/badge/Rate%20Limiting-slowapi-orange)](https://github.com/laurnik/slowapi)
+[![Structured Logging](https://img.shields.io/badge/Logging-structlog-purple)](https://www.structlog.org/)
+[![Metrics](https://img.shields.io/badge/Metrics-Prometheus-orange)](https://prometheus.io/)
+[![Security Headers](https://img.shields.io/badge/Security%20Headers-enabled-brightgreen)](https://owasp.org/www-project-secure-headers/)
 
 > **SOP (Standard Operating Procedure)** — Guía para fundadores no técnicos y equipo técnico.
 > **Versión:** 1.0 | **Stack:** Python 3.12, FastAPI, PostgreSQL 16, SQLModel, Alembic, Docker Compose
@@ -20,13 +24,16 @@
 3. [Modelo de Datos / Data Model](#modelo-de-datos--data-model)
 4. [Endpoints API](#endpoints-api)
 5. [Autenticación y Roles / Auth & Roles](#autenticación-y-roles--auth--roles)
-6. [Importación CSV/Excel / CSV/Excel Import](#importación-csvexcel--csvexcel-import)
-7. [Sincronización de Stock / Stock Sync](#sincronización-de-stock--stock-sync)
-8. [Alertas de Stock Bajo / Low Stock Alerts](#alertas-de-stock-bajo--low-stock-alerts)
-9. [Desarrollo Local / Local Development](#desarrollo-local--local-development)
-10. [Tests / Testing](#tests--testing)
-11. [Variables de Entorno / Environment Variables](#variables-de-entorno--environment-variables)
-12. [Solución de Problemas / Troubleshooting](#solución-de-problemas--troubleshooting)
+6. [Gestión de Usuarios / User Management](#gestión-de-usuarios--user-management)
+7. [Importación CSV/Excel / CSV/Excel Import](#importación-csvexcel--csvexcel-import)
+8. [Sincronización de Stock / Stock Sync](#sincronización-de-stock--stock-sync)
+9. [Alertas de Stock Bajo / Low Stock Alerts](#alertas-de-stock-bajo--low-stock-alerts)
+10. [Rate Limiting y Seguridad / Rate Limiting & Security](#rate-limiting-y-seguridad--rate-limiting--security)
+11. [Observabilidad / Observability](#observabilidad--observability)
+12. [Desarrollo Local / Local Development](#desarrollo-local--local-development)
+13. [Tests / Testing](#tests--testing)
+14. [Variables de Entorno / Environment Variables](#variables-de-entorno--environment-variables)
+15. [Solución de Problemas / Troubleshooting](#solución-de-problemas--troubleshooting)
 
 ---
 
@@ -201,6 +208,91 @@ proyecto4/
 1. `POST /auth/login` con `username` (email) + `password` → `access_token`
 2. Header `Authorization: Bearer <token>` en cada request
 3. Dependencias FastAPI validan rol automáticamente
+
+---
+
+## 👥 Gestión de Usuarios / User Management
+
+### Endpoints (Solo Admin)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/auth/users/` | Crear usuario (email, password, role) |
+| GET | `/auth/users/` | Listar usuarios (paginado) |
+| GET | `/auth/users/{id}` | Detalle usuario |
+| PATCH | `/auth/users/{id}` | Actualizar (email, role, is_active, password) |
+| DELETE | `/auth/users/{id}` | Eliminar usuario |
+
+### Refresh Token Flow
+```bash
+# 1. Login devuelve access_token + refresh_token
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin@example.com&password=admin123!"
+
+# 2. Usar refresh_token para obtener nuevo access_token
+curl -X POST http://localhost:8000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "eyJ..."}'
+
+# 3. Logout revoca refresh_token
+curl -X POST http://localhost:8000/auth/logout \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "eyJ..."}'
+```
+
+- Access token: 60 min (configurable)
+- Refresh token: 7 días, rotación automática, revocación en logout
+- Store en memoria (MVP) → Redis en producción
+
+---
+
+## 🛡️ Rate Limiting y Seguridad / Rate Limiting & Security
+
+### Rate Limiting
+- **Límite global**: 100 req/min por IP (configurable via `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW`)
+- Endpoints protegidos: todos excepto `/health`
+- Headers de respuesta: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+
+### Security Headers (OWASP)
+| Header | Valor |
+|--------|-------|
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `X-XSS-Protection` | `1; mode=block` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'` |
+
+### CORS
+- Orígenes: `*` (desarrollo) → configurar dominios específicos en producción
+- Credenciales permitidas
+- Métodos/Headers: todos
+
+---
+
+## 📊 Observabilidad / Observability
+
+### Structured Logging (structlog)
+- JSON logs con request ID, timestamp UTC, método, path, status, latency
+- Niveles: INFO (requests), WARNING (rate limit), ERROR (excepciones)
+- Reduce ruido: `uvicorn.access`, `sqlalchemy.engine` → WARNING
+
+### Metrics (Prometheus) - `/metrics`
+| Métrica | Tipo | Labels |
+|---------|------|--------|
+| `http_requests_total` | Counter | method, endpoint, status_code |
+| `http_request_duration_seconds` | Histogram | method, endpoint |
+| `active_connections` | Gauge | - |
+| `db_query_duration_seconds` | Histogram | operation |
+
+### Health Checks
+| Endpoint | Descripción | Rate Limit |
+|----------|-------------|------------|
+| `GET /health` | Básico (load balancer) | 60/min |
+| `GET /health/detailed` | DB status, timestamp, versión | 30/min |
+
+### Health Checks Docker
+- **API**: `curl -f http://localhost:8000/health` (interval 30s, timeout 10s, retries 3)
+- **DB**: `pg_isready -U postgres` (interval 5s, timeout 5s, retries 10)
 
 ---
 

@@ -5,28 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-09-24
 
 ### Added
-- GitHub Actions CI/CD pipeline with lint, typecheck, test, build stages
-- Multi-stage Dockerfile with non-root user for security
-- Development override compose file for hot reload
-- Code quality tools: ruff, black, mypy, pre-commit
-- Comprehensive test suite (53 tests, 80%+ coverage)
-- Badges in README (CI, coverage, license, Python version)
-- LICENSE (MIT), CONTRIBUTING.md, CODE_OF_CONDUCT.md
-- Issue templates (bug report, feature request) and PR template
-- pyproject.toml with modern tool configuration
+- **User Management**: CRUD endpoints (`POST/GET/PATCH/DELETE /auth/users/`), admin-only
+- **Refresh Token Flow**: Access (60min) + Refresh (7d) tokens with rotation & revocation
+- **Rate Limiting**: Global 100 req/min per IP via slowapi (configurable)
+- **Security Headers**: OWASP headers (X-Content-Type-Options, X-Frame-Options, CSP, etc.)
+- **CORS**: Configurable origins (default `*` for dev)
+- **Structured Logging**: structlog with JSON, request ID, latency, structured context
+- **Prometheus Metrics**: `/metrics` endpoint (requests, duration, DB queries, connections)
+- **Health Checks**: `/health` (basic) + `/health/detailed` (DB status, timestamp)
+- **User Management API**: Admin-only CRUD for users with role assignment
+- **Refresh Token Flow**: Access (60min) + Refresh (7d) with rotation & revocation on logout
+- **Tests**: 12 new tests for user management, refresh tokens, logout
 
 ### Changed
-- Updated Dockerfile to multi-stage build with non-root user
-- Split docker-compose.yml (base + development override)
-- Improved README with badges and updated demo commands
+- Updated Dockerfile to multi-stage build with non-root user (UID 10001)
+- Added rate limiting (100 req/min global) via slowapi
+- Added OWASP security headers middleware
+- Added structured JSON logging with structlog
+- Added Prometheus metrics endpoint (`/metrics`)
+- Added detailed health check (`/health/detailed`)
+- Updated README with new badges, sections (User Management, Rate Limiting, Observability, Security)
+- Updated CHANGELOG with v1.1.0
 
 ### Security
-- Non-root user in Docker container
-- No hardcoded secrets, all via environment variables
-- JWT tokens with configurable expiration
+- Rate limiting: 100 req/min global (configurable)
+- OWASP security headers (CSP, X-Frame-Options, X-Content-Type-Options, etc.)
+- CORS configurable (default `*` for dev)
+- Non-root user in Docker container (UID 10001)
+- Refresh token rotation & revocation on logout
+- JWT access (60min) + Refresh (7d) tokens
 
 ## [1.0.0] - 2026-09-24
 
