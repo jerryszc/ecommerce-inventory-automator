@@ -208,3 +208,13 @@ def import_from_file_path(
     with open(file_path, "rb") as f:
         file_bytes = f.read()
     return import_stock(session, file_path, file_bytes, created_by)
+
+
+async def import_stock_async(
+    session: Session,
+    filename: str,
+    file_bytes: bytes,
+    created_by: Optional[str] = None,
+) -> ImportResult:
+    """Versión async del importador (para uso en worker)."""
+    return import_stock(session, filename, file_bytes, created_by)

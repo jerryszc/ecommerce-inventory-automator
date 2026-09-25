@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2026-09-24
+## [1.1.0] - 2026-09-25
 
 ### Added
 - **User Management**: CRUD endpoints (`POST/GET/PATCH/DELETE /auth/users/`), admin-only
@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **User Management API**: Admin-only CRUD for users with role assignment
 - **Refresh Token Flow**: Access (60min) + Refresh (7d) with rotation & revocation on logout
 - **Tests**: 12 new tests for user management, refresh tokens, logout
+- **AWS Integrations (LocalStack ready)**:
+  - **Secrets Manager**: JWT_SECRET, DATABASE_URL rotados, cero en código
+  - **CloudWatch Logs**: Structured JSON logs con request ID, latency
+  - **SQS + Lambda**: Imports asíncronos (S3 → SQS → Lambda worker)
+  - **S3**: Upload/download de archivos de importación
+  - **ElastiCache Redis**: Rate limiting distribuido multi-instancia
+  - **ECS Fargate + ECR**: Deploy zero-downtime via GitHub Actions OIDC
+- **Tests**: 12 new tests para user management, refresh tokens, logout + 8 tests AWS
 
 ### Changed
 - Updated Dockerfile to multi-stage build with non-root user (UID 10001)
@@ -27,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added structured JSON logging with structlog
 - Added Prometheus metrics endpoint (`/metrics`)
 - Added detailed health check (`/health/detailed`)
-- Updated README with new badges, sections (User Management, Rate Limiting, Observability, Security)
+- Updated README with new badges, sections (User Management, Rate Limiting, Observability, Security, AWS)
 - Updated CHANGELOG with v1.1.0
 
 ### Security
@@ -37,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Non-root user in Docker container (UID 10001)
 - Refresh token rotation & revocation on logout
 - JWT access (60min) + Refresh (7d) tokens
+- Secrets rotados via AWS Secrets Manager
 
 ## [1.0.0] - 2026-09-24
 

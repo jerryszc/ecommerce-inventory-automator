@@ -1,15 +1,20 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select, text
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
 from app.core.security import hash_password
+from app.core.logging import configure_logging, RequestLoggingMiddleware
+from app.core.rate_limit import distributed_rate_limit
 from app.db.session import engine, create_db_and_tables
 from app.models import Channel, User
 from app.routers import products, variants, channels, inventory, imports, alerts, auth, metrics
@@ -31,8 +36,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# Custom rate limit dependency
+async def rate_limit_dependency(request: Request):
+    allowed, headers = distributed_rate_limit(f"rl:{get_remote_address(request)}")
+    for k, v in headers.items():
+        request.headers.__dict__["_list"].append((k.lower().encode(), v.encode()))
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Configure logging on startup
+    configure_logging()
+
     create_db_and_tables()
     with Session(engine) as session:
         # Seed channels
@@ -70,6 +87,9 @@ def create_app() -> FastAPI:
 
     # Security headers
     app.add_middleware(SecurityHeadersMiddleware)
+
+    # Request logging middleware
+    app.add_middleware(RequestLoggingMiddleware)
 
     @app.get("/health")
     @limiter.limit("60/minute")

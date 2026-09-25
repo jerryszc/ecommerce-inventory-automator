@@ -1,0 +1,29 @@
+{
+  "family": "inventory-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::123456789:role/ecsTaskExecutionRole",
+  "containerDefinitions": [{
+    "name": "api",
+    "image": "123456789.dkr.ecr.us-east-1.amazonaws.com/inventory-api:latest",
+    "portMappings": [{"containerPort": 8000, "protocol": "tcp"}],
+    "environment": [
+      {"name": "AWS_REGION", "value": "us-east-1"},
+      {"name": "SECRETS_ARN_JWT", "value": "arn:aws:secretsmanager:us-east-1:123456789:secret:prod/jwt-secret"}
+    ],
+    "secrets": [
+      {"name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789:secret:prod/database-url"},
+      {"name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789:secret:prod/jwt-secret"}
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/inventory-api",
+        "awslogs-region": "us-east-1",
+        "awslogs-stream-prefix": "api"
+      }
+    }
+  }]
+}

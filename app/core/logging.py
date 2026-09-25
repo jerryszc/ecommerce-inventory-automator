@@ -1,11 +1,36 @@
 import structlog
 import logging
 import sys
-from typing import Any, Dict
+import watchtower
+import boto3
+from app.core.config import settings
+
+
+def _try_cloudwatch_handler():
+    """Try to create CloudWatch handler, return None if not available."""
+    try:
+        handler = watchtower.CloudWatchLogHandler(
+            log_group="ecommerce-api",
+            stream_name="api-logs",
+            boto3_client=boto3.client(
+                "logs",
+                endpoint_url=settings.aws_endpoint_url,
+                region_name=settings.aws_region,
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
+            ),
+            create_log_group=True,
+        )
+        # Test connection
+        handler._ensure_log_group()
+        return handler
+    except Exception:
+        # CloudWatch not available (LocalStack not running, no AWS creds, etc.)
+        return None
 
 
 def configure_logging() -> None:
-    """Configure structured logging with structlog."""
+    """Configure structured logging with structlog + optional CloudWatch."""
     timestamper = structlog.processors.TimeStamper(fmt="iso", utc=True)
 
     shared_processors = [
@@ -17,6 +42,25 @@ def configure_logging() -> None:
         structlog.dev.set_exc_info,
     ]
 
+    # Console handler (always available)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_formatter = structlog.stdlib.ProcessorFormatter(
+        processor=structlog.dev.ConsoleRenderer(colors=True),
+        foreign_pre_chain=shared_processors,
+    )
+    console_handler.setFormatter(console_formatter)
+
+    # CloudWatch handler (optional)
+    cw_handler = None
+    if settings.aws_endpoint_url or settings.app_env != "local":
+        cw_handler = _try_cloudwatch_handler()
+        if cw_handler:
+            cw_formatter = structlog.stdlib.ProcessorFormatter(
+                processor=structlog.processors.JSONRenderer(),
+                foreign_pre_chain=shared_processors,
+            )
+            cw_handler.setFormatter(cw_formatter)
+
     structlog.configure(
         processors=shared_processors + [
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
@@ -26,21 +70,18 @@ def configure_logging() -> None:
         cache_logger_on_first_use=True,
     )
 
-    formatter = structlog.stdlib.ProcessorFormatter(
-        processor=structlog.dev.ConsoleRenderer(colors=True),
-        foreign_pre_chain=shared_processors,
-    )
-
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(formatter)
+    handlers = [console_handler]
+    if cw_handler:
+        handlers.append(cw_handler)
 
     root_logger = logging.getLogger()
-    root_logger.handlers = [handler]
+    root_logger.handlers = handlers
     root_logger.setLevel(logging.INFO)
 
     # Reduce noise from noisy libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("watchtower").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> structlog.BoundLogger:
