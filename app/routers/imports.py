@@ -1,8 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import desc
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.config import settings
 from app.core.deps import require_admin, require_operator_or_admin
@@ -45,7 +44,9 @@ def list_imports(
     session: Annotated[Session, Depends(get_session)],
     _: Annotated[User, Depends(require_operator_or_admin)],
 ) -> list[ImportBatch]:
-    return session.exec(select(ImportBatch).order_by(desc(ImportBatch.created_at))).all()
+    return list(
+        session.exec(select(ImportBatch).order_by(col(ImportBatch.created_at).desc())).all()
+    )
 
 
 @router.get("/{batch_id}", response_model=ImportBatchRead)

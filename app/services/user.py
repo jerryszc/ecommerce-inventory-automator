@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from jose import JWTError, jwt
 from sqlmodel import Session, select
@@ -35,7 +36,7 @@ def get_user_by_email(session: Session, email: str) -> User | None:
 
 
 def list_users(session: Session, skip: int = 0, limit: int = 100) -> list[User]:
-    return session.exec(select(User).offset(skip).limit(limit)).all()
+    return list(session.exec(select(User).offset(skip).limit(limit)).all())
 
 
 def update_user(session: Session, user_id: int, data: dict) -> User | None:
@@ -71,7 +72,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> 
     to_encode = data.copy()
     expire = datetime.now(UTC) + (expires_delta or timedelta(days=7))
     to_encode.update({"exp": expire, "type": "refresh", "jti": str(uuid.uuid4())})
-    token = jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    token = cast(str, jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm))
     _refresh_tokens.add(token)
     return token
 
@@ -80,7 +81,10 @@ def verify_refresh_token(token: str) -> dict | None:
     if token not in _refresh_tokens:
         return None
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = cast(
+            dict,
+            jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]),
+        )
         if payload.get("type") != "refresh":
             return None
         return payload
@@ -89,4 +93,11 @@ def verify_refresh_token(token: str) -> dict | None:
 
 
 def revoke_refresh_token(token: str) -> bool:
-    return _refresh_tokens.discard(token) is not None
+    """Revoke a refresh token. Returns whether it was present to begin with.
+
+    set.discard always returns None, so testing its result made this always
+    report False, including for tokens that were actually revoked.
+    """
+    was_present = token in _refresh_tokens
+    _refresh_tokens.discard(token)
+    return was_present

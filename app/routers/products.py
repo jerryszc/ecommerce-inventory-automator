@@ -34,7 +34,7 @@ def list_products(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ) -> list[Product]:
-    return session.exec(select(Product).offset(skip).limit(limit)).all()
+    return list(session.exec(select(Product).offset(skip).limit(limit)).all())
 
 
 @router.get("/{product_id}", response_model=ProductRead)

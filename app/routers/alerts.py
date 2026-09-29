@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.deps import require_operator_or_admin
 from app.db.session import get_session
@@ -19,9 +19,11 @@ def get_low_stock(
 ) -> list[LowStockAlert]:
     stmt = (
         select(Variant, InventoryLevel, Channel, Product)
-        .join(InventoryLevel, InventoryLevel.variant_id == Variant.id)
-        .join(Channel, Channel.id == InventoryLevel.channel_id)
-        .join(Product, Product.id == Variant.product_id)
+        # col() around the compared column: SQLModel types a == b between two
+        # columns as bool, which SQLAlchemy does not accept as a join condition.
+        .join(InventoryLevel, col(InventoryLevel.variant_id) == col(Variant.id))
+        .join(Channel, col(Channel.id) == col(InventoryLevel.channel_id))
+        .join(Product, col(Product.id) == col(Variant.product_id))
         .where(InventoryLevel.qty <= Variant.threshold)
     )
     if channel_code:

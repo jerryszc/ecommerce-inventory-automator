@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,7 +83,13 @@ def create_app() -> FastAPI:
 
     # Rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # slowapi types its handler as taking RateLimitExceeded, while Starlette
+    # types the parameter as Exception. The handler does receive the specific
+    # exception at runtime, so the cast documents that rather than hides it.
+    app.add_exception_handler(
+        RateLimitExceeded,
+        cast("Any", _rate_limit_exceeded_handler),
+    )
 
     # CORS
     # credentials off while origins is the wildcard: the CORS spec forbids
@@ -115,7 +121,9 @@ def create_app() -> FastAPI:
         db_status = "ok"
         try:
             with Session(engine) as session:
-                session.exec(text("SELECT 1"))
+                # execute, not exec: exec expects a Select and a raw text
+                # clause is not one.
+                session.execute(text("SELECT 1"))
         except Exception:
             db_status = "error"
         return {

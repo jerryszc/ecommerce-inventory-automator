@@ -1,5 +1,6 @@
 import time
 import uuid
+from typing import cast
 
 import redis
 
@@ -14,7 +15,7 @@ def get_redis_client() -> "redis.Redis":
         from app.core.aws import get_redis_client as _get_redis
 
         _redis_client = _get_redis()
-    return _redis_client
+    return cast("redis.Redis", _redis_client)
 
 
 class DistributedRateLimiter:

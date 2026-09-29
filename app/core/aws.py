@@ -1,6 +1,6 @@
 import json
 from functools import cache, lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import boto3
 from botocore.config import Config
@@ -68,7 +68,7 @@ def get_redis_client() -> Any:
 # Helpers de alto nivel
 def get_secret(name: str) -> str:
     client = get_secrets_client()
-    return client.get_secret_value(SecretId=name)["SecretString"]
+    return cast(str, client.get_secret_value(SecretId=name)["SecretString"])
 
 
 def put_secret(name: str, value: str) -> None:
@@ -88,7 +88,7 @@ def ensure_secret(name: str, default_value: str) -> str:
     try:
         client = get_secrets_client()
         try:
-            return client.get_secret_value(SecretId=name)["SecretString"]
+            return cast(str, client.get_secret_value(SecretId=name)["SecretString"])
         except client.exceptions.ResourceNotFoundException:
             client.create_secret(Name=name, SecretString=default_value)
             return default_value
@@ -100,7 +100,7 @@ def ensure_secret(name: str, default_value: str) -> str:
 def enqueue_sqs(queue_url: str, message: dict) -> str:
     client = get_sqs_client()
     resp = client.send_message(QueueUrl=queue_url, MessageBody=json.dumps(message))
-    return resp["MessageId"]
+    return cast(str, resp["MessageId"])
 
 
 def upload_s3(
@@ -114,7 +114,7 @@ def upload_s3(
 def download_s3(bucket: str, key: str) -> bytes:
     client = get_s3_client()
     obj = client.get_object(Bucket=bucket, Key=key)
-    return obj["Body"].read()
+    return cast(bytes, obj["Body"].read())
 
 
 def get_redis() -> "redis.Redis":
@@ -124,4 +124,4 @@ def get_redis() -> "redis.Redis":
     only has to exist for the type checker, and redis is not needed at import
     time here.
     """
-    return get_redis_client()
+    return cast("redis.Redis", get_redis_client())

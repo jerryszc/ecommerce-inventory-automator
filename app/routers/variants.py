@@ -50,7 +50,7 @@ def list_variants(
         stmt = stmt.where(Variant.color == color)
     if low_stock:
         stmt = stmt.where(Variant.threshold > 0)
-    return session.exec(stmt.offset(skip).limit(limit)).all()
+    return list(session.exec(stmt.offset(skip).limit(limit)).all())
 
 
 @router.get("/{variant_id}", response_model=VariantWithProduct)

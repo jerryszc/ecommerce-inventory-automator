@@ -81,4 +81,4 @@ def get_inventory(
         channel = session.exec(select(Channel).where(Channel.code == channel_code)).first()
         if channel:
             stmt = stmt.where(InventoryLevel.channel_id == channel.id)
-    return session.exec(stmt).all()
+    return list(session.exec(stmt).all())

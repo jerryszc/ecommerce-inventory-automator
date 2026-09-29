@@ -34,7 +34,7 @@ def list_channels(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ) -> list[Channel]:
-    return session.exec(select(Channel).offset(skip).limit(limit)).all()
+    return list(session.exec(select(Channel).offset(skip).limit(limit)).all())
 
 
 @router.get("/{channel_id}", response_model=ChannelRead)
