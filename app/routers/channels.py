@@ -1,4 +1,5 @@
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
@@ -16,9 +17,7 @@ def create_channel(
     session: Annotated[Session, Depends(get_session)],
     _: Annotated[User, Depends(require_admin)],
 ) -> Channel:
-    existing = session.exec(
-        select(Channel).where(Channel.code == channel_in.code)
-    ).first()
+    existing = session.exec(select(Channel).where(Channel.code == channel_in.code)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Channel code already exists")
     channel = Channel.model_validate(channel_in)

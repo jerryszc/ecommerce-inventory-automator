@@ -1,10 +1,11 @@
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 
 from app.core.deps import require_operator_or_admin
 from app.db.session import get_session
-from app.models import Variant, InventoryLevel, Channel, Product, User
+from app.models import Channel, InventoryLevel, Product, User, Variant
 from app.schemas import LowStockAlert
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -30,14 +31,16 @@ def get_low_stock(
 
     alerts = []
     for variant, inv, channel, product in results:
-        alerts.append(LowStockAlert(
-            variant_id=variant.id,
-            variant_sku=variant.sku,
-            product_name=product.name,
-            size=variant.size,
-            color=variant.color,
-            channel_code=channel.code,
-            qty=inv.qty,
-            threshold=variant.threshold,
-        ))
+        alerts.append(
+            LowStockAlert(
+                variant_id=variant.id,
+                variant_sku=variant.sku,
+                product_name=product.name,
+                size=variant.size,
+                color=variant.color,
+                channel_code=channel.code,
+                qty=inv.qty,
+                threshold=variant.threshold,
+            )
+        )
     return alerts

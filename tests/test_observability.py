@@ -1,12 +1,14 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
 
 
 def get_admin_token():
-    resp = client.post("/auth/login", data={"username": "admin@example.com", "password": "admin123!"})
+    resp = client.post(
+        "/auth/login", data={"username": "admin@example.com", "password": "admin123!"}
+    )
     return resp.json()["access_token"]
 
 
@@ -22,7 +24,9 @@ class TestHealthEndpoints:
 
     def test_health_detailed(self):
         token = get_admin_token()
-        resp = client.get("/health/detailed", headers={"Authorization": f"Bearer {get_admin_token()}"})
+        resp = client.get(
+            "/health/detailed", headers={"Authorization": f"Bearer {get_admin_token()}"}
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"

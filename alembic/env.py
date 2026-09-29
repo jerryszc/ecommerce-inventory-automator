@@ -1,8 +1,10 @@
 from logging.config import fileConfig
+
 from sqlalchemy import pool
-from alembic import context
 from sqlmodel import SQLModel
+
 import app.models  # noqa: F401  (ensures models register on metadata)
+from alembic import context
 from app.core.config import settings
 
 config = context.config

@@ -1,12 +1,15 @@
-import structlog
 import logging
 import sys
-import watchtower
+from typing import Any
+
 import boto3
+import structlog
+import watchtower
+
 from app.core.config import settings
 
 
-def _try_cloudwatch_handler():
+def _try_cloudwatch_handler() -> Any:
     """Try to create CloudWatch handler, return None if not available."""
     try:
         handler = watchtower.CloudWatchLogHandler(
@@ -62,7 +65,8 @@ def configure_logging() -> None:
             cw_handler.setFormatter(cw_formatter)
 
     structlog.configure(
-        processors=shared_processors + [
+        processors=shared_processors
+        + [
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -92,19 +96,20 @@ def get_logger(name: str) -> structlog.BoundLogger:
 class RequestLoggingMiddleware:
     """Middleware to log requests with structured logging."""
 
-    def __init__(self, app):
+    def __init__(self, app: Any):
         self.app = app
         self.logger = get_logger("request")
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
         import time
+
         start_time = time.time()
 
-        async def send_wrapper(message):
+        async def send_wrapper(message: dict) -> None:
             if message["type"] == "http.response.start":
                 process_time = time.time() - start_time
                 self.logger.info(

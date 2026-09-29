@@ -1,7 +1,9 @@
-import redis
 import time
+import uuid
+
+import redis
+
 from app.core.config import settings
-from app.core.aws import get_redis_client as _get_redis_client
 
 _redis_client = None
 
@@ -10,6 +12,7 @@ def get_redis_client() -> "redis.Redis":
     global _redis_client
     if _redis_client is None:
         from app.core.aws import get_redis_client as _get_redis
+
         _redis_client = _get_redis()
     return _redis_client
 
@@ -30,15 +33,20 @@ class DistributedRateLimiter:
         now = int(time.time())
         window_start = now - self.window
 
-        # Sliding window log algorithm
+        # Sliding window log: one sorted-set member per request, scored by its
+        # timestamp, so entries outside the window can be dropped by score.
+        # The member needs a unique suffix: using the bare second as the member
+        # makes every request inside the same second overwrite the previous
+        # one, so the count stays at 1 and the limit never triggers.
+        member = f"{now}-{uuid.uuid4().hex[:8]}"
         pipe = self.redis.pipeline()
         pipe.zremrangebyscore(key, 0, window_start)
         pipe.zcard(key)
-        pipe.zadd(key, {str(now): now})
+        pipe.zadd(key, {member: now})
         pipe.expire(key, self.window)
         results = pipe.execute()
 
-        current_count = results[1]
+        current_count = results[1] + 1
         allowed = current_count < self.limit
 
         headers = {
@@ -51,8 +59,7 @@ class DistributedRateLimiter:
 
 
 _distributed_limiter = DistributedRateLimiter(
-    limit=settings.rate_limit_requests,
-    window=settings.rate_limit_window
+    limit=settings.rate_limit_requests, window=settings.rate_limit_window
 )
 
 

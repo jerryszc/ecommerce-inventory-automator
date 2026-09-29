@@ -1,8 +1,8 @@
-import pytest
 from sqlmodel import Session, select
-from app.db.session import engine
-from app.models import Channel, Product, Variant, InventoryLevel, User
+
 from app.core.security import hash_password, verify_password
+from app.db.session import engine
+from app.models import Channel, InventoryLevel, Product, User, Variant
 
 
 def test_hash_verify_password():
@@ -33,6 +33,7 @@ def test_seed_users_exist():
 
 def _unique_sku(base: str) -> str:
     import uuid
+
     return f"{base}-{uuid.uuid4().hex[:8]}"
 
 

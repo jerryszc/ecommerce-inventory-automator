@@ -1,26 +1,34 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 
-from app.core.deps import get_current_user, require_admin, create_access_token
-from app.core.security import verify_password
+from app.core.deps import get_current_user, require_admin
+from app.core.security import create_access_token, verify_password
 from app.db.session import get_session
 from app.models import User
-from app.schemas import UserRead, Token, UserCreate, UserUpdate, UserRead, TokenRefresh, TokenPair
+from app.schemas import TokenPair, TokenRefresh, UserCreate, UserRead, UserUpdate
 from app.services.user import (
-    create_user, get_user, get_user_by_email, list_users, update_user, delete_user,
-    create_refresh_token, verify_refresh_token, revoke_refresh_token
+    create_refresh_token,
+    create_user,
+    delete_user,
+    get_user,
+    get_user_by_email,
+    list_users,
+    revoke_refresh_token,
+    update_user,
+    verify_refresh_token,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=TokenPair)
 def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: Session = Depends(get_session),
-) -> Token:
+) -> TokenPair:
     user = session.exec(select(User).where(User.email == form_data.username)).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -35,14 +43,18 @@ def login(
         )
     access_token = create_access_token(data={"sub": user.email})
     refresh_token = create_refresh_token(data={"sub": user.email})
-    return Token(access_token=access_token, token_type="bearer")
+    return TokenPair(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+    )
 
 
-@router.post("/refresh", response_model=Token)
+@router.post("/refresh", response_model=TokenPair)
 def refresh_token(
     token_data: TokenRefresh,
     session: Session = Depends(get_session),
-) -> Token:
+) -> TokenPair:
     payload = verify_refresh_token(token_data.refresh_token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
@@ -55,7 +67,11 @@ def refresh_token(
     access_token = create_access_token(data={"sub": user.email})
     new_refresh_token = create_refresh_token(data={"sub": user.email})
 
-    return Token(access_token=access_token, token_type="bearer")
+    return TokenPair(
+        access_token=access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+    )
 
 
 @router.post("/logout")
@@ -72,6 +88,7 @@ def read_me(
 
 
 # User Management (Admin only)
+
 
 @router.post("/users/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def create_user_endpoint(

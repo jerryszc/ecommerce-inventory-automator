@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+
 from pydantic import BaseModel, Field
 from sqlmodel import SQLModel
 
@@ -40,9 +41,9 @@ class ProductRead(ProductBase):
 
 class VariantBase(SQLModel):
     sku: str = Field(max_length=100)
-    size: Optional[str] = Field(default=None, max_length=50)
-    color: Optional[str] = Field(default=None, max_length=50)
-    ean: Optional[str] = Field(default=None, max_length=50)
+    size: str | None = Field(default=None, max_length=50)
+    color: str | None = Field(default=None, max_length=50)
+    ean: str | None = Field(default=None, max_length=50)
     price: float = Field(default=0.0, ge=0)
     threshold: int = Field(default=5, ge=0)
 
@@ -101,7 +102,7 @@ class ImportBatchRead(SQLModel):
     total: int
     ok: int
     errors: int
-    created_by: Optional[str]
+    created_by: str | None
     created_at: datetime
 
     class Config:
@@ -110,7 +111,7 @@ class ImportBatchRead(SQLModel):
 
 class ImportErrorRow(SQLModel):
     row: int
-    sku: Optional[str]
+    sku: str | None
     error: str
 
 
@@ -126,22 +127,11 @@ class LowStockAlert(SQLModel):
     variant_id: int
     variant_sku: str
     product_name: str
-    size: Optional[str]
-    color: Optional[str]
+    size: str | None
+    color: str | None
     channel_code: str
     qty: int
     threshold: int
-
-
-class UserRead(SQLModel):
-    id: int
-    email: str
-    role: str
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class Token(SQLModel):
@@ -160,10 +150,10 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(SQLModel):
-    email: Optional[str] = Field(default=None, max_length=255)
-    role: Optional[str] = Field(default=None, max_length=20)
-    is_active: Optional[bool] = None
-    password: Optional[str] = Field(default=None, min_length=8, max_length=72)
+    email: str | None = Field(default=None, max_length=255)
+    role: str | None = Field(default=None, max_length=20)
+    is_active: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=72)
 
 
 class UserRead(UserBase):

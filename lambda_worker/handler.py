@@ -1,8 +1,7 @@
 import json
 import logging
+
 from app.services.aws_sqs import process_import_job
-from app.db.session import engine
-from sqlmodel import Session
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

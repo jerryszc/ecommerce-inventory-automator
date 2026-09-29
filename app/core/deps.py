@@ -1,15 +1,13 @@
-from datetime import datetime, timezone
 from typing import Annotated
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import jwt, JWTError
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from sqlmodel import Session, select
 
 from app.core.config import settings
-from app.core.security import verify_password, create_access_token
 from app.db.session import get_session
 from app.models import User
-
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -24,14 +22,14 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    except JWTError as exc:
+        # `from exc` keeps the original cause in the traceback, which is the
+        # difference between a diagnosable failure and a bare 401.
+        raise credentials_exception from exc
     user = session.exec(select(User).where(User.email == email)).first()
     if user is None or not user.is_active:
         raise credentials_exception

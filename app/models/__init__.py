@@ -1,18 +1,19 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
-from sqlmodel import SQLModel, Field, Relationship
+
 from sqlalchemy import UniqueConstraint
+from sqlmodel import Field, Relationship, SQLModel
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Channel(SQLModel, table=True):
     __tablename__ = "channel"
     __table_args__ = (UniqueConstraint("code", name="uq_channel_code"),)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     code: str = Field(index=True, max_length=50)
     name: str = Field(max_length=100)
     created_at: datetime = Field(default_factory=utcnow)
@@ -25,7 +26,7 @@ class Product(SQLModel, table=True):
     __tablename__ = "product"
     __table_args__ = (UniqueConstraint("sku_base", name="uq_product_sku_base"),)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     sku_base: str = Field(index=True, max_length=100)
     name: str = Field(max_length=255)
     created_at: datetime = Field(default_factory=utcnow)
@@ -37,12 +38,12 @@ class Variant(SQLModel, table=True):
     __tablename__ = "variant"
     __table_args__ = (UniqueConstraint("sku", name="uq_variant_sku"),)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="product.id", index=True)
     sku: str = Field(index=True, max_length=100)
-    size: Optional[str] = Field(default=None, max_length=50)
-    color: Optional[str] = Field(default=None, max_length=50)
-    ean: Optional[str] = Field(default=None, max_length=50, index=True)
+    size: str | None = Field(default=None, max_length=50)
+    color: str | None = Field(default=None, max_length=50)
+    ean: str | None = Field(default=None, max_length=50, index=True)
     price: float = Field(default=0.0)
     threshold: int = Field(default=5)
     created_at: datetime = Field(default_factory=utcnow)
@@ -70,7 +71,7 @@ class InventoryLevel(SQLModel, table=True):
 class ConflictLog(SQLModel, table=True):
     __tablename__ = "conflict_log"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     variant_id: int = Field(foreign_key="variant.id", index=True)
     channel_id: int = Field(foreign_key="channel.id", index=True)
     old_qty: int
@@ -85,12 +86,12 @@ class ConflictLog(SQLModel, table=True):
 class ImportBatch(SQLModel, table=True):
     __tablename__ = "import_batch"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     filename: str = Field(max_length=255)
     total: int = Field(default=0)
     ok: int = Field(default=0)
     errors: int = Field(default=0)
-    created_by: Optional[str] = Field(default=None, max_length=100)
+    created_by: str | None = Field(default=None, max_length=100)
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -98,7 +99,7 @@ class User(SQLModel, table=True):
     __tablename__ = "user"
     __table_args__ = (UniqueConstraint("email", name="uq_user_email"),)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     email: str = Field(index=True, max_length=255)
     hashed_password: str = Field(max_length=255)
     role: str = Field(max_length=20, default="operator")  # "admin" or "operator"

@@ -1,11 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from sqlmodel import Session, select
 
-from app.models import InventoryLevel, Channel, ConflictLog, Variant
+from app.models import Channel, ConflictLog, InventoryLevel, Variant
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def sync_inventory(
@@ -39,13 +40,15 @@ def sync_inventory(
     if existing:
         if existing.qty != qty:
             # Log conflict: old value is the loser
-            session.add(ConflictLog(
-                variant_id=variant_id,
-                channel_id=channel.id,
-                old_qty=existing.qty,
-                new_qty=qty,
-                loser_qty=existing.qty,
-            ))
+            session.add(
+                ConflictLog(
+                    variant_id=variant_id,
+                    channel_id=channel.id,
+                    old_qty=existing.qty,
+                    new_qty=qty,
+                    loser_qty=existing.qty,
+                )
+            )
             conflict_logged = True
         existing.qty = qty
         existing.updated_at = now

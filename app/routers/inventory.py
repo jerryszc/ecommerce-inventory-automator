@@ -1,12 +1,13 @@
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.core.deps import require_admin, require_operator_or_admin
 from app.db.session import get_session
-from app.models import InventoryLevel, Channel, Variant, Product, User
+from app.models import InventoryLevel, User
 from app.schemas import InventoryLevelRead, InventorySync, InventorySyncResult
-from app.services.sync import sync_inventory, get_inventory
+from app.services.sync import get_inventory, sync_inventory
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -35,7 +36,7 @@ def sync_stock(
             qty=sync_in.qty,
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     return InventorySyncResult(
         variant_id=inv.variant_id,
         channel_code=sync_in.channel_code,

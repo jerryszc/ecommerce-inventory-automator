@@ -1,17 +1,16 @@
 import csv
 import io
-from datetime import datetime, timezone
-from typing import Optional
-from sqlmodel import Session, select
+from datetime import UTC, datetime
 
 import openpyxl
+from sqlmodel import Session, select
 
-from app.models import ImportBatch, Product, Variant, Channel, InventoryLevel
+from app.models import Channel, ImportBatch, InventoryLevel, Product, Variant
 from app.schemas import ImportErrorRow, ImportResult
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # Column alias mapping for messy CSV headers
@@ -33,7 +32,7 @@ def _normalize_header(h: str) -> str:
     return h.strip().lower().replace(" ", "_").replace("-", "_")
 
 
-def _find_column(headers: list[str], target: str) -> Optional[int]:
+def _find_column(headers: list[str], target: str) -> int | None:
     aliases = [target] + HEADER_ALIASES.get(target, [])
     normalized_aliases = [_normalize_header(a) for a in aliases]
     for i, h in enumerate(headers):
@@ -78,7 +77,7 @@ def import_stock(
     session: Session,
     filename: str,
     file_bytes: bytes,
-    created_by: Optional[str] = None,
+    created_by: str | None = None,
 ) -> ImportResult:
     rows = parse_file(filename, file_bytes)
     if not rows:
@@ -109,9 +108,17 @@ def import_stock(
 
     for idx, row in enumerate(rows, start=1):
         try:
-            sku = str(row[list(row.keys())[col_sku]]).strip() if row[list(row.keys())[col_sku]] else ""
+            sku = (
+                str(row[list(row.keys())[col_sku]]).strip()
+                if row[list(row.keys())[col_sku]]
+                else ""
+            )
             qty_raw = row[list(row.keys())[col_qty]]
-            qty = int(float(str(qty_raw).strip())) if qty_raw is not None and str(qty_raw).strip() else 0
+            qty = (
+                int(float(str(qty_raw).strip()))
+                if qty_raw is not None and str(qty_raw).strip()
+                else 0
+            )
 
             if qty < 0:
                 raise ValueError("Negative qty not allowed")
@@ -122,13 +129,43 @@ def import_stock(
             variant = session.exec(select(Variant).where(Variant.sku == sku)).first()
             if not variant:
                 # Try to create product + variant from available data
-                size = str(row[list(row.keys())[col_size]]).strip() if col_size is not None and row[list(row.keys())[col_size]] else None
-                color = str(row[list(row.keys())[col_color]]).strip() if col_color is not None and row[list(row.keys())[col_color]] else None
-                price = float(str(row[list(row.keys())[col_price]]).strip()) if col_price is not None and row[list(row.keys())[col_price]] else 0.0
-                threshold = int(float(str(row[list(row.keys())[col_threshold]]).strip())) if col_threshold is not None and row[list(row.keys())[col_threshold]] else 5
-                product_name = str(row[list(row.keys())[col_product_name]]).strip() if col_product_name is not None and row[list(row.keys())[col_product_name]] else sku
-                sku_base = str(row[list(row.keys())[col_sku_base]]).strip() if col_sku_base is not None and row[list(row.keys())[col_sku_base]] else sku.rsplit("-", 1)[0] if "-" in sku else sku
-                ean = str(row[list(row.keys())[col_ean]]).strip() if col_ean is not None and row[list(row.keys())[col_ean]] else None
+                size = (
+                    str(row[list(row.keys())[col_size]]).strip()
+                    if col_size is not None and row[list(row.keys())[col_size]]
+                    else None
+                )
+                color = (
+                    str(row[list(row.keys())[col_color]]).strip()
+                    if col_color is not None and row[list(row.keys())[col_color]]
+                    else None
+                )
+                price = (
+                    float(str(row[list(row.keys())[col_price]]).strip())
+                    if col_price is not None and row[list(row.keys())[col_price]]
+                    else 0.0
+                )
+                threshold = (
+                    int(float(str(row[list(row.keys())[col_threshold]]).strip()))
+                    if col_threshold is not None and row[list(row.keys())[col_threshold]]
+                    else 5
+                )
+                product_name = (
+                    str(row[list(row.keys())[col_product_name]]).strip()
+                    if col_product_name is not None and row[list(row.keys())[col_product_name]]
+                    else sku
+                )
+                sku_base = (
+                    str(row[list(row.keys())[col_sku_base]]).strip()
+                    if col_sku_base is not None and row[list(row.keys())[col_sku_base]]
+                    else sku.rsplit("-", 1)[0]
+                    if "-" in sku
+                    else sku
+                )
+                ean = (
+                    str(row[list(row.keys())[col_ean]]).strip()
+                    if col_ean is not None and row[list(row.keys())[col_ean]]
+                    else None
+                )
 
                 product = session.exec(select(Product).where(Product.sku_base == sku_base)).first()
                 if not product:
@@ -170,22 +207,26 @@ def import_stock(
                 existing.updated_at = utcnow()
                 session.add(existing)
             else:
-                session.add(InventoryLevel(
-                    variant_id=variant.id,
-                    channel_id=channel.id,
-                    qty=qty,
-                    updated_at=utcnow(),
-                ))
+                session.add(
+                    InventoryLevel(
+                        variant_id=variant.id,
+                        channel_id=channel.id,
+                        qty=qty,
+                        updated_at=utcnow(),
+                    )
+                )
 
             batch.ok += 1
 
         except Exception as e:
             batch.errors += 1
-            error_rows.append(ImportErrorRow(
-                row=idx,
-                sku=sku if "sku" in locals() else None,
-                error=str(e),
-            ))
+            error_rows.append(
+                ImportErrorRow(
+                    row=idx,
+                    sku=sku if "sku" in locals() else None,
+                    error=str(e),
+                )
+            )
 
     batch.total = len(rows)
     session.add(batch)
@@ -203,7 +244,7 @@ def import_stock(
 def import_from_file_path(
     session: Session,
     file_path: str,
-    created_by: Optional[str] = None,
+    created_by: str | None = None,
 ) -> ImportResult:
     with open(file_path, "rb") as f:
         file_bytes = f.read()
@@ -214,7 +255,7 @@ async def import_stock_async(
     session: Session,
     filename: str,
     file_bytes: bytes,
-    created_by: Optional[str] = None,
+    created_by: str | None = None,
 ) -> ImportResult:
     """Versión async del importador (para uso en worker)."""
     return import_stock(session, filename, file_bytes, created_by)

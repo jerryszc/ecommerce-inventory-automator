@@ -1,31 +1,33 @@
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
-from app.main import app
-from app.db.session import engine
-from app.models import Product, Variant, Channel, InventoryLevel, ConflictLog, ImportBatch
-from app.services.sync import sync_inventory
-from app.services.importer import import_stock
 
+from app.db.session import engine
+from app.main import app
+from app.models import Channel, ConflictLog, InventoryLevel
 
 client = TestClient(app)
 
 
 def _unique_sku(base: str) -> str:
     import uuid
+
     return f"{base}-{uuid.uuid4().hex[:8]}"
 
 
 def get_admin_token() -> str:
     """Get admin JWT token"""
-    resp = client.post("/auth/login", data={"username": "admin@example.com", "password": "admin123!"})
+    resp = client.post(
+        "/auth/login", data={"username": "admin@example.com", "password": "admin123!"}
+    )
     assert resp.status_code == 200
     return resp.json()["access_token"]
 
 
 def get_operator_token() -> str:
     """Get operator JWT token"""
-    resp = client.post("/auth/login", data={"username": "operator@example.com", "password": "operator123!"})
+    resp = client.post(
+        "/auth/login", data={"username": "operator@example.com", "password": "operator123!"}
+    )
     assert resp.status_code == 200
     return resp.json()["access_token"]
 
@@ -41,22 +43,32 @@ def auth_header_operator() -> dict:
 class TestInventorySync:
     def test_sync_creates_new_inventory(self):
         sku = _unique_sku("SYNC")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "Sync Parent"}, headers=auth_header_admin()).json()
+        prod = client.post(
+            "/products/", json={"sku_base": sku, "name": "Sync Parent"}, headers=auth_header_admin()
+        ).json()
         variant_sku = _unique_sku("VSYNC")
-        variant = client.post("/variants/", json={
-            "product_id": prod["id"],
-            "sku": variant_sku,
-            "size": "M",
-            "color": "RED",
-            "price": 19.99,
-            "threshold": 10,
-        }, headers=auth_header_admin()).json()
+        variant = client.post(
+            "/variants/",
+            json={
+                "product_id": prod["id"],
+                "sku": variant_sku,
+                "size": "M",
+                "color": "RED",
+                "price": 19.99,
+                "threshold": 10,
+            },
+            headers=auth_header_admin(),
+        ).json()
 
-        resp = client.post("/inventory/sync", json={
-            "variant_id": variant["id"],
-            "channel_code": "amazon",
-            "qty": 25,
-        }, headers=auth_header_admin())
+        resp = client.post(
+            "/inventory/sync",
+            json={
+                "variant_id": variant["id"],
+                "channel_code": "amazon",
+                "qty": 25,
+            },
+            headers=auth_header_admin(),
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["qty"] == 25
@@ -71,90 +83,164 @@ class TestInventorySync:
 
     def test_sync_operator_forbidden(self):
         sku = _unique_sku("SYNCOP")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "Sync Parent"}, headers=auth_header_admin()).json()
-        variant = client.post("/variants/", json={
-            "product_id": prod["id"],
-            "sku": _unique_sku("VSYNCOP"),
-            "size": "M",
-            "color": "RED",
-            "price": 19.99,
-            "threshold": 10,
-        }, headers=auth_header_admin()).json()
+        prod = client.post(
+            "/products/", json={"sku_base": sku, "name": "Sync Parent"}, headers=auth_header_admin()
+        ).json()
+        variant = client.post(
+            "/variants/",
+            json={
+                "product_id": prod["id"],
+                "sku": _unique_sku("VSYNCOP"),
+                "size": "M",
+                "color": "RED",
+                "price": 19.99,
+                "threshold": 10,
+            },
+            headers=auth_header_admin(),
+        ).json()
 
-        resp = client.post("/inventory/sync", json={
-            "variant_id": variant["id"],
-            "channel_code": "amazon",
-            "qty": 25,
-        }, headers=auth_header_operator())
+        resp = client.post(
+            "/inventory/sync",
+            json={
+                "variant_id": variant["id"],
+                "channel_code": "amazon",
+                "qty": 25,
+            },
+            headers=auth_header_operator(),
+        )
         assert resp.status_code == 403
 
     def test_sync_updates_existing_no_conflict_log(self):
         sku = _unique_sku("SYNC2")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "Sync Parent 2"}, headers=auth_header_admin()).json()
+        prod = client.post(
+            "/products/",
+            json={"sku_base": sku, "name": "Sync Parent 2"},
+            headers=auth_header_admin(),
+        ).json()
         variant_sku = _unique_sku("VSYNC2")
-        variant = client.post("/variants/", json={
-            "product_id": prod["id"],
-            "sku": variant_sku,
-            "size": "L",
-            "color": "BLUE",
-            "price": 29.99,
-            "threshold": 5,
-        }, headers=auth_header_admin()).json()
+        variant = client.post(
+            "/variants/",
+            json={
+                "product_id": prod["id"],
+                "sku": variant_sku,
+                "size": "L",
+                "color": "BLUE",
+                "price": 29.99,
+                "threshold": 5,
+            },
+            headers=auth_header_admin(),
+        ).json()
 
         # First sync
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10}, headers=auth_header_admin())
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10},
+            headers=auth_header_admin(),
+        )
         # Second sync with same qty
-        resp = client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10}, headers=auth_header_admin())
+        resp = client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10},
+            headers=auth_header_admin(),
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["conflict_logged"] is False
 
     def test_sync_updates_different_qty_logs_conflict(self):
         sku = _unique_sku("SYNC3")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "Sync Parent 3"}, headers=auth_header_admin()).json()
+        prod = client.post(
+            "/products/",
+            json={"sku_base": sku, "name": "Sync Parent 3"},
+            headers=auth_header_admin(),
+        ).json()
         variant_sku = _unique_sku("VSYNC3")
-        variant = client.post("/variants/", json={
-            "product_id": prod["id"],
-            "sku": variant_sku,
-            "size": "XL",
-            "color": "GREEN",
-            "price": 39.99,
-            "threshold": 5,
-        }, headers=auth_header_admin()).json()
+        variant = client.post(
+            "/variants/",
+            json={
+                "product_id": prod["id"],
+                "sku": variant_sku,
+                "size": "XL",
+                "color": "GREEN",
+                "price": 39.99,
+                "threshold": 5,
+            },
+            headers=auth_header_admin(),
+        ).json()
 
         # First sync
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10}, headers=auth_header_admin())
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10},
+            headers=auth_header_admin(),
+        )
         # Second sync with different qty
-        resp = client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 20}, headers=auth_header_admin())
+        resp = client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 20},
+            headers=auth_header_admin(),
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["conflict_logged"] is True
 
         # Verify ConflictLog
         with Session(engine) as session:
-            logs = session.exec(select(ConflictLog).where(ConflictLog.variant_id == variant["id"])).all()
+            logs = session.exec(
+                select(ConflictLog).where(ConflictLog.variant_id == variant["id"])
+            ).all()
             assert len(logs) == 1
             assert logs[0].old_qty == 10
             assert logs[0].new_qty == 20
             assert logs[0].loser_qty == 10
 
     def test_sync_invalid_variant_returns_404(self):
-        resp = client.post("/inventory/sync", json={"variant_id": 999999, "channel_code": "amazon", "qty": 10}, headers=auth_header_admin())
+        resp = client.post(
+            "/inventory/sync",
+            json={"variant_id": 999999, "channel_code": "amazon", "qty": 10},
+            headers=auth_header_admin(),
+        )
         assert resp.status_code == 404
 
     def test_sync_invalid_channel_returns_404(self):
         sku = _unique_sku("SYNC4")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "Sync Parent 4"}, headers=auth_header_admin()).json()
-        variant = client.post("/variants/", json={"product_id": prod["id"], "sku": _unique_sku("VSYNC4"), "price": 10}, headers=auth_header_admin()).json()
-        resp = client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "nonexistent", "qty": 10}, headers=auth_header_admin())
+        prod = client.post(
+            "/products/",
+            json={"sku_base": sku, "name": "Sync Parent 4"},
+            headers=auth_header_admin(),
+        ).json()
+        variant = client.post(
+            "/variants/",
+            json={"product_id": prod["id"], "sku": _unique_sku("VSYNC4"), "price": 10},
+            headers=auth_header_admin(),
+        ).json()
+        resp = client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "nonexistent", "qty": 10},
+            headers=auth_header_admin(),
+        )
         assert resp.status_code == 404
 
     def test_list_inventory_with_filters(self):
         sku = _unique_sku("LIST")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "List Parent"}, headers=auth_header_admin()).json()
-        variant = client.post("/variants/", json={"product_id": prod["id"], "sku": _unique_sku("VLIST"), "price": 10}, headers=auth_header_admin()).json()
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 5}, headers=auth_header_admin())
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "shopify", "qty": 15}, headers=auth_header_admin())
+        prod = client.post(
+            "/products/", json={"sku_base": sku, "name": "List Parent"}, headers=auth_header_admin()
+        ).json()
+        variant = client.post(
+            "/variants/",
+            json={"product_id": prod["id"], "sku": _unique_sku("VLIST"), "price": 10},
+            headers=auth_header_admin(),
+        ).json()
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 5},
+            headers=auth_header_admin(),
+        )
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "shopify", "qty": 15},
+            headers=auth_header_admin(),
+        )
 
         resp = client.get(f"/inventory/?variant_id={variant['id']}", headers=auth_header_operator())
         assert resp.status_code == 200
@@ -235,17 +321,29 @@ class TestImports:
 class TestAlerts:
     def test_low_stock_alert_triggered(self):
         sku = _unique_sku("ALERT")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "Alert Parent"}, headers=auth_header_admin()).json()
-        variant = client.post("/variants/", json={
-            "product_id": prod["id"],
-            "sku": _unique_sku("VALERT"),
-            "size": "M",
-            "color": "RED",
-            "price": 15.0,
-            "threshold": 10,
-        }, headers=auth_header_admin()).json()
+        prod = client.post(
+            "/products/",
+            json={"sku_base": sku, "name": "Alert Parent"},
+            headers=auth_header_admin(),
+        ).json()
+        variant = client.post(
+            "/variants/",
+            json={
+                "product_id": prod["id"],
+                "sku": _unique_sku("VALERT"),
+                "size": "M",
+                "color": "RED",
+                "price": 15.0,
+                "threshold": 10,
+            },
+            headers=auth_header_admin(),
+        ).json()
         # Sync with qty below threshold
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 5}, headers=auth_header_admin())
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 5},
+            headers=auth_header_admin(),
+        )
 
         resp = client.get("/alerts/low-stock", headers=auth_header_operator())
         assert resp.status_code == 200
@@ -262,15 +360,27 @@ class TestAlerts:
 
     def test_low_stock_alert_not_triggered_above_threshold(self):
         sku = _unique_sku("NOALERT")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "No Alert Parent"}, headers=auth_header_admin()).json()
-        variant = client.post("/variants/", json={
-            "product_id": prod["id"],
-            "sku": _unique_sku("VNOALERT"),
-            "price": 15.0,
-            "threshold": 5,
-        }, headers=auth_header_admin()).json()
+        prod = client.post(
+            "/products/",
+            json={"sku_base": sku, "name": "No Alert Parent"},
+            headers=auth_header_admin(),
+        ).json()
+        variant = client.post(
+            "/variants/",
+            json={
+                "product_id": prod["id"],
+                "sku": _unique_sku("VNOALERT"),
+                "price": 15.0,
+                "threshold": 5,
+            },
+            headers=auth_header_admin(),
+        ).json()
         # Sync with qty above threshold
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10}, headers=auth_header_admin())
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 10},
+            headers=auth_header_admin(),
+        )
 
         resp = client.get("/alerts/low-stock", headers=auth_header_operator())
         assert resp.status_code == 200
@@ -280,15 +390,31 @@ class TestAlerts:
 
     def test_low_stock_alert_filter_by_channel(self):
         sku = _unique_sku("ALERTCH")
-        prod = client.post("/products/", json={"sku_base": sku, "name": "Alert Channel Parent"}, headers=auth_header_admin()).json()
-        variant = client.post("/variants/", json={
-            "product_id": prod["id"],
-            "sku": _unique_sku("VALERTCH"),
-            "price": 15.0,
-            "threshold": 10,
-        }, headers=auth_header_admin()).json()
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 3}, headers=auth_header_admin())
-        client.post("/inventory/sync", json={"variant_id": variant["id"], "channel_code": "shopify", "qty": 20}, headers=auth_header_admin())
+        prod = client.post(
+            "/products/",
+            json={"sku_base": sku, "name": "Alert Channel Parent"},
+            headers=auth_header_admin(),
+        ).json()
+        variant = client.post(
+            "/variants/",
+            json={
+                "product_id": prod["id"],
+                "sku": _unique_sku("VALERTCH"),
+                "price": 15.0,
+                "threshold": 10,
+            },
+            headers=auth_header_admin(),
+        ).json()
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "amazon", "qty": 3},
+            headers=auth_header_admin(),
+        )
+        client.post(
+            "/inventory/sync",
+            json={"variant_id": variant["id"], "channel_code": "shopify", "qty": 20},
+            headers=auth_header_admin(),
+        )
 
         resp = client.get("/alerts/low-stock?channel_code=amazon", headers=auth_header_operator())
         assert resp.status_code == 200

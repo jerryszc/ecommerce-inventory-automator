@@ -1,6 +1,8 @@
-from datetime import datetime, timedelta
-from jose import jwt
+from datetime import UTC, datetime, timedelta
+
 import bcrypt
+from jose import jwt
+
 from app.core.config import settings
 
 
@@ -19,8 +21,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    from datetime import timezone
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 

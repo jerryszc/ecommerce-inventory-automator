@@ -2,13 +2,14 @@
 """Local CSV/Excel import script. Usage: python -m app.scripts.import_csv <file_path>"""
 
 import sys
+
 from sqlmodel import Session
 
 from app.db.session import engine
 from app.services.importer import import_from_file_path
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python -m app.scripts.import_csv <file_path>")
         sys.exit(1)

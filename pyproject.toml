@@ -32,19 +32,19 @@ dependencies = [
     "redis>=5.0.0",
     "localstack-client>=1.0",
 ]
-optional-dependencies = {
-    "dev": [
-        "pytest>=8.3.0",
-        "pytest-cov>=4.1.0",
-        "httpx>=0.28.0",
-    ],
-    "quality": [
-        "ruff>=0.4.0",
-        "black>=24.3.0",
-        "mypy>=1.10.0",
-        "pre-commit>=3.7.0",
-    ],
-}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.28.0",
+]
+quality = [
+    "ruff>=0.4.0",
+    "black>=24.3.0",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/jerryszc/ecommerce-inventory-automator"
@@ -54,6 +54,22 @@ Issues = "https://github.com/jerryszc/ecommerce-inventory-automator/issues"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+# README.md holds Python snippets for illustration. They are intentionally not
+# kept byte-identical to the source, and formatting them makes CI fail on docs.
+extend-exclude = ["*.md"]
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "pgdata",
+    ".pytest_cache",
+    "htmlcov",
+    "dist",
+    "build",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -66,24 +82,20 @@ select = [
     "T20", # flake8-print
 ]
 ignore = [
-    "E501",  # line too long (handled by black)
+    "E501",  # line too long (handled by the formatter)
     "B008",  # function calls in default args
 ]
-per-file-ignores = {
-    "tests/*": ["S101", "S106"],  # assert, hardcoded passwords in tests
-    "alembic/*": ["S101", "T201"], # migrations
-}
-exclude = [
-    ".venv",
-    ".git",
-    "__pycache__",
-    "pgdata",
-    ".pytest_cache",
-    "htmlcov",
-    "dist",
-    "build",
-    "*.egg-info",
-]
+
+[tool.ruff.lint.per-file-ignores]
+# Re-export modules: the imports are the public surface.
+"app/models/__init__.py" = ["F401"]
+"app/schemas/__init__.py" = ["F401"]
+# CLI script: printing is the point.
+"app/scripts/*" = ["T201"]
+# Tests: assert and print are fine, and some fixtures bind a value they only
+# need for the side effect of calling.
+"tests/*" = ["S101", "S106", "T201", "F841"]
+"alembic/*" = ["S101", "T201"]        # migrations are generated
 
 [tool.ruff.format]
 quote-style = "double"
@@ -138,10 +150,17 @@ exclude = [
 
 [[tool.mypy.overrides]]
 module = [
-    "sqlmodel.*",
-    "pydantic.*",
-    "fastapi.*",
-    "starlette.*",
+"sqlmodel.*",
+"pydantic.*",
+"fastapi.*",
+"starlette.*",
+# No stubs published for these; ignoring them removes the import-untyped
+# noise without weakening checking of our own code.
+"boto3.*",
+"botocore.*",
+"jose.*",
+"openpyxl.*",
+"slowapi.*",
 ]
 ignore_missing_imports = true
 

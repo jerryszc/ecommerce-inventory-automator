@@ -1,10 +1,11 @@
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
-from app.core.deps import get_current_user, require_admin, require_operator_or_admin
+from app.core.deps import require_admin, require_operator_or_admin
 from app.db.session import get_session
-from app.models import Product, Variant, User
+from app.models import Product, User, Variant
 from app.schemas import VariantCreate, VariantRead, VariantWithProduct
 
 router = APIRouter(prefix="/variants", tags=["variants"])
@@ -19,9 +20,7 @@ def create_variant(
     product = session.get(Product, variant_in.product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    existing = session.exec(
-        select(Variant).where(Variant.sku == variant_in.sku)
-    ).first()
+    existing = session.exec(select(Variant).where(Variant.sku == variant_in.sku)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Variant SKU already exists")
     variant = Variant.model_validate(variant_in)

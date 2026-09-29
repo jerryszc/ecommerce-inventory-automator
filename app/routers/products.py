@@ -1,8 +1,9 @@
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
-from app.core.deps import get_current_user, require_admin, require_operator_or_admin
+from app.core.deps import require_admin, require_operator_or_admin
 from app.db.session import get_session
 from app.models import Product, User
 from app.schemas import ProductCreate, ProductRead
@@ -16,9 +17,7 @@ def create_product(
     session: Annotated[Session, Depends(get_session)],
     _: Annotated[User, Depends(require_admin)],
 ) -> Product:
-    existing = session.exec(
-        select(Product).where(Product.sku_base == product_in.sku_base)
-    ).first()
+    existing = session.exec(select(Product).where(Product.sku_base == product_in.sku_base)).first()
     if existing:
         raise HTTPException(status_code=400, detail="SKU base already exists")
     product = Product.model_validate(product_in)
