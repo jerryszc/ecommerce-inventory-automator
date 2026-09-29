@@ -1,6 +1,7 @@
 import csv
 import io
 from datetime import UTC, datetime
+from typing import cast
 
 import openpyxl
 from sqlmodel import Session, select
@@ -175,7 +176,7 @@ def import_stock(
                     session.refresh(product)
 
                 variant = Variant(
-                    product_id=product.id,
+                    product_id=cast(int, product.id),
                     sku=sku,
                     size=size,
                     color=color,
@@ -209,8 +210,8 @@ def import_stock(
             else:
                 session.add(
                     InventoryLevel(
-                        variant_id=variant.id,
-                        channel_id=channel.id,
+                        variant_id=cast(int, variant.id),
+                        channel_id=cast(int, channel.id),
                         qty=qty,
                         updated_at=utcnow(),
                     )
@@ -233,7 +234,7 @@ def import_stock(
     session.commit()
 
     return ImportResult(
-        batch_id=batch.id,
+        batch_id=cast(int, batch.id),
         total=batch.total,
         ok=batch.ok,
         errors=batch.errors,

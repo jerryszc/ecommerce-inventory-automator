@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, col, select
@@ -35,7 +35,7 @@ def get_low_stock(
     for variant, inv, channel, product in results:
         alerts.append(
             LowStockAlert(
-                variant_id=variant.id,
+                variant_id=cast(int, variant.id),
                 variant_sku=variant.sku,
                 product_name=product.name,
                 size=variant.size,

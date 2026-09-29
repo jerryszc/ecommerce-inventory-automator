@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import cast
 
 from sqlmodel import Session, select
 
@@ -22,6 +23,9 @@ def sync_inventory(
     channel = session.exec(select(Channel).where(Channel.code == channel_code)).first()
     if not channel:
         raise ValueError(f"Channel '{channel_code}' not found")
+    # The row came from the database, so the id is set. The model types it as
+    # optional because that is the type before insertion.
+    channel_pk = cast(int, channel.id)
 
     variant = session.get(Variant, variant_id)
     if not variant:
@@ -30,7 +34,7 @@ def sync_inventory(
     existing = session.exec(
         select(InventoryLevel).where(
             InventoryLevel.variant_id == variant_id,
-            InventoryLevel.channel_id == channel.id,
+            InventoryLevel.channel_id == channel_pk,
         )
     ).first()
 
@@ -43,7 +47,7 @@ def sync_inventory(
             session.add(
                 ConflictLog(
                     variant_id=variant_id,
-                    channel_id=channel.id,
+                    channel_id=channel_pk,
                     old_qty=existing.qty,
                     new_qty=qty,
                     loser_qty=existing.qty,
@@ -59,7 +63,7 @@ def sync_inventory(
     else:
         inv = InventoryLevel(
             variant_id=variant_id,
-            channel_id=channel.id,
+            channel_id=channel_pk,
             qty=qty,
             updated_at=now,
         )
@@ -80,5 +84,5 @@ def get_inventory(
     if channel_code:
         channel = session.exec(select(Channel).where(Channel.code == channel_code)).first()
         if channel:
-            stmt = stmt.where(InventoryLevel.channel_id == channel.id)
+            stmt = stmt.where(InventoryLevel.channel_id == cast(int, channel.id))
     return list(session.exec(stmt).all())
