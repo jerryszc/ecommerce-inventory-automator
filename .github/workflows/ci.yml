@@ -126,7 +126,12 @@ jobs:
         with:
           files: ./coverage.xml
           flags: unittests
-          fail_ci_if_error: true
+          # Publishing is not part of the quality gate. Without a repository
+          # token the upload is rejected, and failing the job there hides the
+          # result the run actually produced. The coverage floor is enforced by
+          # --cov-fail-under on the step above.
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   build:
     name: Build Docker Image
