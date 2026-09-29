@@ -36,7 +36,7 @@ ocurrió. El `ConflictLog` y la tabla de auditoría cubren eso.
 
 ---
 
-## Uso profesional: quién opera esto y por qué
+## Contexto de uso: quién opera esto y por qué
 
 Este servicio es la **capa de integración entre el ERP o la planilla del negocio y los
 marketplaces donde se vende**. No tiene usuarios finales: la usa el equipo de operaciones o
