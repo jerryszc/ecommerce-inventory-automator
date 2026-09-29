@@ -35,6 +35,78 @@ Without a trail, an inventory discrepancy is impossible to diagnose after the fa
 
 ---
 
+## Use case: who runs this and why
+
+This service is the **integration layer between a business's ERP or spreadsheet and the
+marketplaces it sells on**. It has no end users: the operations or logistics team uses it,
+and its actual customer is the business, not the developer.
+
+**The three roles that consume it in a real business**
+
+| Who | How they use it | What they gain |
+| :--- | :--- | :--- |
+| **Catalogue operations** | Uploads the supplier CSV and reviews the per-row error report | Load several suppliers with the same process, and a file with unexpected columns no longer stops the whole batch |
+| **Logistics / stock owner** | Queries the alerts endpoint filtered by channel and SKU | Learns about the shortfall before the sale is lost, instead of after |
+| **Store administration** | Reads the `ConflictLog` when a marketplace and the ERP disagree | Knows which channel changed what and when, so they can reconcile instead of guess |
+
+**The flow it represents**
+
+```
+POST /imports  -->  upload to S3 (raw/)  -->  enqueue to SQS
+                                                  |
+                                                  v
+                                    process_import_job  <-- called by the worker
+                                                  |
+                          normalise + deduplicate + per-row report
+                                                  |
+                                    move to S3 (processed/), delete raw/
+```
+
+Two pieces of this flow are written and two are not:
+
+| Piece | Status |
+| :--- | :--- |
+| `upload_s3` of the file and `enqueue_import_job` with the key in the message | Implemented and wired to the import endpoint |
+| `process_import_job`: download from S3, import, move to `processed/`, delete the original | **Implemented** in `app/services/aws_sqs.py:25`, but **nothing calls it** |
+| The consumer that reads the queue and calls `process_import_job` | **Does not exist.** No polling loop and no Lambda handler |
+| The S3 to SQS trigger via event notification | **Does not exist.** Today the HTTP endpoint enqueues directly |
+
+A function that is written but disconnected is exactly the kind of detail worth raising in
+an interview: the work is largely done, and what remains is deciding **who** runs it.
+
+**Why AWS rather than a cron on a server**
+
+- **S3** as the intake tray keeps the file out of the process: if the worker dies halfway
+  through a batch, the file is still there and the job can be retried without the client
+  resending it.
+- **SQS** decouples submission from processing, and with a *visibility timeout* it guarantees
+  that if a worker dies, another one picks the message up. A cron gives no such guarantee.
+- **Secrets Manager** so that no marketplace credential lives in the repository or in a `.env`
+  on a server.
+- **LocalStack** makes it possible to test S3 and SQS at no cost and with no AWS account,
+  which is what lets CI run on every push.
+
+**What would be needed before production**
+
+- **The queue consumer.** It is the only thing blocking the async flow. The architectural
+  decision is real: if the load is irregular, Lambda is cheaper; if it is continuous, a worker
+  on ECS is easier to observe and debug.
+- **Visibility of job status.** `ImportBatch` exists, but an endpoint is needed to check
+  progress and retry the ones that failed, not just read a log.
+- **More explicit conflict resolution.** It is last-write-wins today and the losing value goes
+  to `ConflictLog`. A real business wants a rule per product type.
+- **Outbound webhooks** to the ERP, so synchronisation is bidirectional and nobody has to poll.
+- **Periodic reconciliation** comparing marketplaces against the ERP, raising alerts on
+  divergence and not only on low stock.
+
+**Which role this work maps to**
+
+Backend Developer in e-commerce, logistics, or at agencies that manage Amazon and Shopify
+sellers. It is integration work: understanding the business domain, proposing the right
+reconciliation rule, and leaving it running without manual intervention.
+
+---
+
 ## Verifiable impact
 
 Everything below is backed by code and by this repository's test suite. There are no
