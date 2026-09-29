@@ -196,7 +196,9 @@ jobs:
           name: requirements-lock.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        # v1 runs on Node 20, which GitHub has deprecated, and the action
+        # failed with "Too many retries" and no message. v2 is the current one.
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
