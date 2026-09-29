@@ -32,3 +32,11 @@ Thumbs.db
 
 # Local dev overrides (not committed)
 docker-compose.override.yml
+
+# Local working files (not part of the public repo)
+PROFILE_README.md
+PROFILE_README.pdf
+CV_Jhosbert_Osorio_ATS.md
+trabajos_ordenados.md
+trabajos.txt
+opencode.json
