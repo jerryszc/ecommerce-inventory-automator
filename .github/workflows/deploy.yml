@@ -12,6 +12,37 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: inventory
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      localstack:
+        image: localstack/localstack:3
+        env:
+          SERVICES: secretsmanager,s3,sqs
+        ports: ["4566:4566"]
+        options: >-
+          --health-cmd="curl -f http://localhost:4566/_localstack/health"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,10 +50,30 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
-      - run: pytest -q --cov=app --cov-fail-under=80
+      - name: Wait for LocalStack
+        run: |
+          for i in {1..60}; do
+            curl -sf http://localhost:4566/_localstack/health && break
+            sleep 2
+          done
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/inventory
+          REDIS_URL: redis://localhost:6379/0
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          APP_ENV: local
+        run: pytest -q --cov=app --cov-fail-under=80
 
   build-and-deploy:
     needs: test
+    # Only meaningful once a real AWS role is configured. The ARN that was
+    # here was a placeholder, so the deploy step could never have succeeded.
+    # It is now driven by a secret and skipped when the secret is absent, which
+    # keeps the test job meaningful instead of red for a missing account.
+    if: ${{ secrets.AWS_DEPLOY_ROLE_ARN != '' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -33,7 +84,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::123456789:role/GitHubDeploy
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
