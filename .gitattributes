@@ -1,0 +1,12 @@
+# Declare text files as text so git never treats them as binary.
+* text=auto eol=lf
+
+*.py   text diff=python
+*.md   text
+*.yml  text
+*.yaml text
+*.toml text
+*.txt  text
+*.json text
+*.sh   text eol=lf
+Dockerfile text
