@@ -36,6 +36,79 @@ ocurrió. El `ConflictLog` y la tabla de auditoría cubren eso.
 
 ---
 
+## Uso profesional: quién opera esto y por qué
+
+Este servicio es la **capa de integración entre el ERP o la planilla del negocio y los
+marketplaces donde se vende**. No tiene usuarios finales: la usa el equipo de operaciones o
+logística, y su cliente real es el comercio, no quien programa.
+
+**Los tres roles que lo consumen en un negocio real**
+
+| Quién | Cómo lo usa | Qué gana |
+| :--- | :--- | :--- |
+| **Operaciones de catálogo** | Sube el CSV del proveedor y revisa el reporte de errores por fila | Cargar varios proveedores con un mismo proceso, y que un archivo con columnas inesperadas no detenga el lote completo |
+| **Logística / responsable de stock** | Consulta el endpoint de alertas con filtro por canal y por SKU | Enterarse del faltante antes de que se pierda la venta, en vez de después |
+| **Administración del comercio** | Lee el `ConflictLog` cuando un marketplace y el ERP no coinciden | Saber qué canal cambió qué y cuándo, para conciliar en lugar de suponer |
+
+**El flujo que representa**
+
+```
+POST /imports  ──►  upload a S3 (raw/)  ──►  enqueue en SQS
+                                                  │
+                                                  ▼
+                                    process_import_job  ◄── lo invoca el worker
+                                                  │
+                          normaliza + deduplica + reporte por fila
+                                                  │
+                                        mueve a S3 (processed/) y borra raw/
+```
+
+Dos piezas de este flujo están escritas y dos no:
+
+| Pieza | Estado |
+| :--- | :--- |
+| `upload_s3` del archivo y `enqueue_import_job` con la clave en el mensaje | Implementado y conectado al endpoint de importación |
+| `process_import_job`: descarga de S3, importa, mueve a `processed/`, borra el original | **Implementado** en `app/services/aws_sqs.py:25`, pero **nadie lo invoca** |
+| El consumidor que lee la cola y llama a `process_import_job` | **No existe.** No hay bucle de polling ni handler de Lambda |
+| El disparador S3 → SQS por notificación de evento | **No existe.** Hoy el mensaje lo encola el propio endpoint HTTP |
+
+Que la función esté escrita pero desconectada es exactamente el tipo de detalle que conviene
+decir en una entrevista: el 90% del trabajo está hecho y lo que falta es decidir **quién**
+la ejecuta.
+
+**Por qué AWS y no un cron en un servidor**
+
+- **S3** como bandeja de entrada deja el archivo fuera del proceso: si el worker se cae a
+  mitad del lote, el archivo sigue ahí y se puede reintentar sin que el cliente lo reenvíe.
+- **SQS** desacopla el envío del procesamiento, y con *visibility timeout* garantiza que si un
+  worker muere, otro retoma el mensaje. Un cron no da esa garantía.
+- **Secrets Manager** para que ninguna credencial de marketplace viva en el repositorio ni en
+  un `.env` de un servidor.
+- **LocalStack** permite probar S3 y SQS sin costo ni cuenta de AWS, que es lo que hace
+  posible que CI corra en cada push.
+
+**Qué tendría que añadirse antes de ponerlo en producción**
+
+- **El consumidor de la cola.** Es lo único que bloquea el flujo asíncrono. La decisión de
+  arquitectura es real: si la carga es irregular, Lambda sale más barato; si es continua, un
+  worker en ECS es más simple de observar y depurar.
+- **Visibilidad del estado del trabajo.** `ImportBatch` existe, pero hace falta un endpoint
+  para consultar el progreso y reintentar los que quedaron en error, no solo el log.
+- **Resolución de conflictos más explícita.** Hoy es *last-write-wins* y el valor perdedor queda
+  en `ConflictLog`. En un negocio real conviene una regla por tipo de producto.
+- **Webhooks de salida** hacia el ERP, para que la sincronización sea bidireccional y no haya
+  que consultar cada cierto tiempo.
+- **Reconciliación periódica** que compare marketplaces contra el ERP y levante alertas de
+  divergencia, no solo de faltante.
+
+**A qué puesto corresponde este trabajo**
+
+Backend Developer en e-commerce, logística, o en agencias que gestionan vendedores de Amazon y
+Shopify. Es trabajo de integración: entender el dominio del negocio, proponer la regla de
+conciliación correcta y dejarla ejecutándose sin intervención manual.
+
+---
+
 ## Impacto verificable
 
 Todo lo que sigue está respaldado por código y por la suite de tests de este repositorio.
